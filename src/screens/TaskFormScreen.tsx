@@ -12,6 +12,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { formatDateTime } from "../utils/format";
 import { PRESET_LOCATIONS, PresetLocation } from "../constants";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../navigation/types";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { TaskInput, useTaskStore } from "../storage/taskStore";
+import { useEffect } from "react";
 
 function pickDateTime(current: Date, onPicked: (date: Date) => void) {
   DateTimePickerAndroid.open({
@@ -33,7 +38,20 @@ function pickDateTime(current: Date, onPicked: (date: Date) => void) {
   });
 }
 
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+type FormRoute = RouteProp<RootStackParamList, "TaskForm">;
+
 export default function TaskFormScreen() {
+    
+  const navigation = useNavigation<Nav>();
+  const { params } = useRoute<FormRoute>();
+  const existing = useTaskStore((s) =>
+    s.tasks.find((t) => t.id === params?.taskId),
+  );
+  const addTask = useTaskStore((s) => s.addTask);
+  const updateTask = useTaskStore((s) => s.updateTask);
+  const isEdit = Boolean(existing);
+
   const {
     control,
     handleSubmit,
@@ -43,15 +61,28 @@ export default function TaskFormScreen() {
     formState: { errors },
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      dueDate: new Date(Date.now() + 60 * 60 * 1000),
-      address: "",
-      latitude: undefined,
-      longitude: undefined,
-    },
+    defaultValues: existing
+      ? {
+          title: existing.title,
+          description: existing.description,
+          dueDate: new Date(existing.dueDate),
+          address: existing.location.address,
+          latitude: existing.location.latitude,
+          longitude: existing.location.longitude,
+        }
+      : {
+          title: "",
+          description: "",
+          dueDate: new Date(Date.now() + 60 * 60 * 1000),
+          address: "",
+          latitude: undefined,
+          longitude: undefined,
+        },
   });
+
+  useEffect(()=>{
+    navigation.setOptions({title: isEdit ? "Edit Task" : "New task"})
+  },[navigation, isEdit])
 
   const [lat, lng] = watch(["latitude", "longitude"]);
 
@@ -61,11 +92,28 @@ export default function TaskFormScreen() {
   };
 
   const onSubmit = (values: TaskFormValues) => {
-    if (values.dueDate.getTime() <= Date.now()) {
+    if (!isEdit && values.dueDate.getTime() <= Date.now()) {
       setError("dueDate", { message: "Due date must be in the future" });
       return;
     }
-    console.log(values);
+    const input: TaskInput = {
+        title: values.title,
+        description: values.description,
+        dueDate: values.dueDate.toISOString(),
+        location: {
+            address: values.address,
+            latitude: values.latitude,
+            longitude: values.longitude,
+        },
+        attachedFiles: existing?.attachedFiles ?? [],
+    }
+
+    if (existing) {
+        updateTask(existing.id, input)
+    } else {
+        addTask(input)
+    }
+    navigation.goBack()
   };
   return (
     <ScrollView

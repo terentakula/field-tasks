@@ -36,7 +36,7 @@ export default function TaskCard({ task, onPress }: Props) {
       </View>
       <Text style={styles.meta}>Due: {formatDateTime(task.dueDate)}</Text>
       <Text style={styles.meta} numberOfLines={1}>
-        {task.location.adress}
+        {task.location.address}
       </Text>
       {task.syncStatus !== "synced" && (
         <Text style={styles.sync}>

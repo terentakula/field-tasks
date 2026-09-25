@@ -9,7 +9,7 @@ export interface AttachedFile {
 }
 
 export interface TaskLocation {
-    adress: string
+    address: string
     latitude?: number
     longitude?: number
 }
