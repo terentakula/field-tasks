@@ -19,6 +19,7 @@ export interface Task {
     title: string
     description: string
     dueDate: string
+    location: TaskLocation
     attachedFiles: AttachedFile[]
     status: TaskStatus
     createdAt: string
