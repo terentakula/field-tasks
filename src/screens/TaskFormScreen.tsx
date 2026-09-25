@@ -11,6 +11,7 @@ import { TaskFormValues, taskSchema } from "../utils/taskValidation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { formatDateTime } from "../utils/format";
+import { PRESET_LOCATIONS, PresetLocation } from "../constants";
 
 function pickDateTime(current: Date, onPicked: (date: Date) => void) {
   DateTimePickerAndroid.open({
@@ -37,6 +38,8 @@ export default function TaskFormScreen() {
     control,
     handleSubmit,
     setError,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -45,8 +48,17 @@ export default function TaskFormScreen() {
       description: "",
       dueDate: new Date(Date.now() + 60 * 60 * 1000),
       address: "",
+      latitude: undefined,
+      longitude: undefined,
     },
   });
+
+  const [lat, lng] = watch(["latitude", "longitude"]);
+
+  const selectPoint = (point?: PresetLocation) => {
+    setValue("latitude", point?.latitude);
+    setValue("longitude", point?.longitude);
+  };
 
   const onSubmit = (values: TaskFormValues) => {
     if (values.dueDate.getTime() <= Date.now()) {
@@ -134,6 +146,39 @@ export default function TaskFormScreen() {
         <Text style={styles.error}>{errors.address.message}</Text>
       )}
 
+      <Text style={styles.label}>Map point (optional)</Text>
+      <View style={styles.chips}>
+        <Pressable
+          style={[styles.chip, lat === undefined && styles.chipActive]}
+          onPress={() => selectPoint(undefined)}
+          accessibilityRole="button"
+        >
+          <Text
+            style={[
+              styles.chipText,
+              lat === undefined && styles.chipTextActive,
+            ]}
+          >
+            None
+          </Text>
+        </Pressable>
+        {PRESET_LOCATIONS.map((p) => {
+          const active = lat === p.latitude && lng === p.longitude;
+          return (
+            <Pressable
+              key={p.label}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => selectPoint(p)}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {p.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Pressable
         style={styles.button}
         onPress={handleSubmit(onSubmit)}
@@ -179,4 +224,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#E5E7EB",
+  },
+  chipActive: { backgroundColor: "#2563EB" },
+  chipText: { fontSize: 14, color: "#111" },
+  chipTextActive: { color: "#fff", fontWeight: "600" },
 });
