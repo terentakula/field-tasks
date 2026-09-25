@@ -9,23 +9,50 @@ import {
 } from "react-native";
 import { TaskFormValues, taskSchema } from "../utils/taskValidation";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
+import { formatDateTime } from "../utils/format";
+
+function pickDateTime(current: Date, onPicked: (date: Date) => void) {
+  DateTimePickerAndroid.open({
+    value: current,
+    mode: "date",
+    minimumDate: new Date(),
+    onChange: (event, date) => {
+      if (event.type !== "set" || !date) return;
+      DateTimePickerAndroid.open({
+        value: date,
+        mode: "time",
+        is24Hour: true,
+        onChange: (event, dataTime) => {
+          if (event.type !== "set" || !dataTime) return;
+          onPicked(dataTime);
+        },
+      });
+    },
+  });
+}
 
 export default function TaskFormScreen() {
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: "",
       description: "",
-      dueDate: new Date(),
+      dueDate: new Date(Date.now() + 60 * 60 * 1000),
       address: "",
     },
   });
 
   const onSubmit = (values: TaskFormValues) => {
+    if (values.dueDate.getTime() <= Date.now()) {
+      setError("dueDate", { message: "Due date must be in the future" });
+      return;
+    }
     console.log(values);
   };
   return (
@@ -66,6 +93,27 @@ export default function TaskFormScreen() {
       />
       {errors.description && (
         <Text style={styles.error}>{errors.description.message}</Text>
+      )}
+
+      <Text style={styles.label}>Due date & time</Text>
+      <Controller
+        control={control}
+        name="dueDate"
+        render={({ field: { value, onChange } }) => (
+          <Pressable
+            style={[styles.input, errors.dueDate && styles.inputError]}
+            onPress={() => pickDateTime(value, onChange)}
+            accessibilityRole="button"
+            accessibilityLabel="Choose due date and time"
+          >
+            <Text style={styles.dateText}>
+              {formatDateTime(value.toISOString())}
+            </Text>
+          </Pressable>
+        )}
+      />
+      {errors.dueDate && (
+        <Text style={styles.error}>{errors.dueDate.message}</Text>
       )}
 
       <Text style={styles.label}>Address</Text>
@@ -120,6 +168,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: "top",
   },
+  dateText: { fontSize: 16 },
   inputError: { borderColor: "#DC2626" },
   error: { color: "#DC2626", fontSize: 13 },
   button: {
