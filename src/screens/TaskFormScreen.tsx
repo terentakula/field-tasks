@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
   Pressable,
+  Alert,
 } from "react-native";
 import { TaskFormValues, taskSchema } from "../utils/taskValidation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +17,10 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/types";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { TaskInput, useTaskStore } from "../storage/taskStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { AttachedFile } from "../types/task";
+import AttachmentThumb from "../components/AttachmentThumb";
+import { pickDocument, pickImage } from "../services/attachmentService";
 
 function pickDateTime(current: Date, onPicked: (date: Date) => void) {
   DateTimePickerAndroid.open({
@@ -42,7 +46,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type FormRoute = RouteProp<RootStackParamList, "TaskForm">;
 
 export default function TaskFormScreen() {
-    
+
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<FormRoute>();
   const existing = useTaskStore((s) =>
@@ -51,6 +55,21 @@ export default function TaskFormScreen() {
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const isEdit = Boolean(existing);
+
+  const  [attachments, setAttachments] = useState<AttachedFile[]>(existing?.attachedFiles ?? [])
+  const addAttachment = async (pick: () => Promise<AttachedFile | null>) => {
+    try {
+        const file = await pick();
+        if (file) setAttachments((prev) => [...prev, file]);
+    } catch (error) {
+        console.log('Attachment error:', error);
+        Alert.alert('Could not attach file', 'Please try again or choose another file.');
+    }
+  }
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((f) => f.id !== id));
+  };
 
   const {
     control,
@@ -105,7 +124,7 @@ export default function TaskFormScreen() {
             latitude: values.latitude,
             longitude: values.longitude,
         },
-        attachedFiles: existing?.attachedFiles ?? [],
+        attachedFiles: attachments,
     }
 
     if (existing) {
@@ -225,6 +244,24 @@ export default function TaskFormScreen() {
             </Pressable>
           );
         })}
+      </View>
+
+
+      <Text style={styles.label}>Attachments</Text>
+      {attachments.length > 0 && (
+        <View style={styles.chips}>
+          {attachments.map((f) => (
+            <AttachmentThumb key={f.id} file={f} onRemove={() => removeAttachment(f.id)} />
+          ))}
+        </View>
+      )}
+      <View style={styles.chips}>
+        <Pressable style={styles.chip} onPress={() => addAttachment(pickImage)} accessibilityRole="button">
+          <Text style={styles.chipText}>+ Photo</Text>
+        </Pressable>
+        <Pressable style={styles.chip} onPress={() => addAttachment(pickDocument)} accessibilityRole="button">
+          <Text style={styles.chipText}>+ PDF</Text>
+        </Pressable>
       </View>
 
       <Pressable
