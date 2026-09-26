@@ -6,6 +6,7 @@ import { TaskStatus } from "../types/task";
 import { STATUS_LABELS, useTaskStore } from "../storage/taskStore";
 import StatusBadge from "../components/StatusBadge";
 import { formatDateTime } from "../utils/format";
+import AttachmentThumb from '../components/AttachmentThumb';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type DetaliRoute = RouteProp<RootStackParamList, "TaskDetails">;
@@ -68,9 +69,15 @@ export default function TaskDetailsScreen() {
         )}
 
         <Text style={styles.label}>Attachments</Text>
-      <Text style={styles.muted}>
-        {task.attachedFiles.length === 0 ? 'No attachments' : `${task.attachedFiles.length} file(s)`}
-      </Text>
+        {task.attachedFiles.length === 0 ? (
+          <Text style={styles.muted}>No attachments</Text>
+        ) : (
+          <View style={styles.row}>
+            {task.attachedFiles.map((f) => (
+              <AttachmentThumb key={f.id} file={f} />
+            ))}
+          </View>
+        )}
 
       <Text style={styles.label}>Change status</Text>
       <View style={styles.row}>
