@@ -1,12 +1,20 @@
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Alert, ScrollView, StyleSheet, Text, View , Pressable} from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+} from "react-native";
 import { RootStackParamList } from "../navigation/types";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { TaskStatus } from "../types/task";
 import { STATUS_LABELS, useTaskStore } from "../storage/taskStore";
 import StatusBadge from "../components/StatusBadge";
 import { formatDateTime } from "../utils/format";
-import AttachmentThumb from '../components/AttachmentThumb';
+import AttachmentThumb from "../components/AttachmentThumb";
+import { cancelReminder } from "../services/notificationService";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type DetaliRoute = RouteProp<RootStackParamList, "TaskDetails">;
@@ -14,70 +22,71 @@ type DetaliRoute = RouteProp<RootStackParamList, "TaskDetails">;
 const STATUS_ACTIONS: TaskStatus[] = ["in_progress", "completed", "canceled"];
 
 export default function TaskDetailsScreen() {
+  const navigation = useNavigation<Nav>();
+  const { params } = useRoute<DetaliRoute>();
+  const task = useTaskStore((s) =>
+    s.tasks.find((t) => t.id === params.taskId && !t.deleted),
+  );
+  const history = useTaskStore((s) => s.history);
+  const changeStatus = useTaskStore((s) => s.changeStatus);
+  const deleteTask = useTaskStore((s) => s.deleteTask);
+  const setNotificationId = useTaskStore((s) => s.setNotificationId);
 
-    const navigation = useNavigation<Nav>()
-    const {params} = useRoute<DetaliRoute>()
-    const task = useTaskStore((s)=> s.tasks.find((t)=> t.id === params.taskId && !t.deleted))
-    const history = useTaskStore((s) => s.history);
-    const changeStatus = useTaskStore((s) => s.changeStatus);
-    const deleteTask = useTaskStore((s) => s.deleteTask);
+  if (!task) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>This task no longer exists.</Text>
+      </View>
+    );
+  }
 
-    if (!task) {
-        return (
-            <View style={styles.center}>
-                <Text style={styles.muted}>This task no longer exists.</Text>
-            </View>
-        )
-    }
+  const taskHistory = history.filter((h) => h.taskId === task.id);
 
-    const taskHistory = history.filter((h)=> h.taskId === task.id)
-
-    const confirmDelete = () => {
-        Alert.alert('Delete task?', `"${task.title}" will be removed.`, [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => {
-              deleteTask(task.id);
-              navigation.goBack();
-            },
-          },
-        ]);
-    };
-
+  const confirmDelete = () => {
+    Alert.alert("Delete task?", `"${task.title}" will be removed.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          cancelReminder(task.notificationId);
+          navigation.goBack();
+        },
+      },
+    ]);
+  };
 
   return (
-    <ScrollView  contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-            <Text style={styles.title}>{task.title}</Text>
-            <StatusBadge status={task.status}/>
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{task.title}</Text>
+        <StatusBadge status={task.status} />
+      </View>
+
+      <Text style={styles.label}>Description</Text>
+      <Text style={styles.body}>{task.description}</Text>
+
+      <Text style={styles.label}>Due</Text>
+      <Text style={styles.body}>{formatDateTime(task.dueDate)}</Text>
+
+      <Text style={styles.label}>Location</Text>
+      <Text style={styles.body}>{task.location.address}</Text>
+      {task.location.latitude !== undefined && (
+        <Text style={styles.muted}>
+          {task.location.latitude}, {task.location.longitude}
+        </Text>
+      )}
+
+      <Text style={styles.label}>Attachments</Text>
+      {task.attachedFiles.length === 0 ? (
+        <Text style={styles.muted}>No attachments</Text>
+      ) : (
+        <View style={styles.row}>
+          {task.attachedFiles.map((f) => (
+            <AttachmentThumb key={f.id} file={f} />
+          ))}
         </View>
-
-        <Text style={styles.label}>Description</Text>
-        <Text style={styles.body}>{task.description}</Text>
-
-        <Text style={styles.label}>Due</Text>
-        <Text style={styles.body}>{formatDateTime(task.dueDate)}</Text>
-
-        <Text style={styles.label}>Location</Text>
-        <Text style={styles.body}>{task.location.address}</Text>
-        {task.location.latitude !== undefined && (
-            <Text style={styles.muted}>
-              {task.location.latitude}, {task.location.longitude}
-            </Text>
-        )}
-
-        <Text style={styles.label}>Attachments</Text>
-        {task.attachedFiles.length === 0 ? (
-          <Text style={styles.muted}>No attachments</Text>
-        ) : (
-          <View style={styles.row}>
-            {task.attachedFiles.map((f) => (
-              <AttachmentThumb key={f.id} file={f} />
-            ))}
-          </View>
-        )}
+      )}
 
       <Text style={styles.label}>Change status</Text>
       <View style={styles.row}>
@@ -85,7 +94,13 @@ export default function TaskDetailsScreen() {
           <Pressable
             key={s}
             style={styles.secondaryButton}
-            onPress={() => changeStatus(task.id, s)}
+            onPress={() => {
+              changeStatus(task.id, s);
+              if (s === 'completed' || s === 'canceled') {
+                cancelReminder(task.notificationId);
+                setNotificationId(task.id, undefined);
+              }
+            }}
             accessibilityRole="button"
           >
             <Text style={styles.secondaryText}>{STATUS_LABELS[s]}</Text>
@@ -96,7 +111,7 @@ export default function TaskDetailsScreen() {
       <View style={styles.row}>
         <Pressable
           style={[styles.primaryButton, styles.flex]}
-          onPress={() => navigation.navigate('TaskForm', { taskId: task.id })}
+          onPress={() => navigation.navigate("TaskForm", { taskId: task.id })}
           accessibilityRole="button"
         >
           <Text style={styles.primaryText}>Edit</Text>
@@ -117,8 +132,6 @@ export default function TaskDetailsScreen() {
           <Text style={styles.body}>{entry.description}</Text>
         </View>
       ))}
-
-        
     </ScrollView>
   );
 }

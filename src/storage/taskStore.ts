@@ -41,6 +41,7 @@ interface TaskState {
   changeStatus: (id: string, status: TaskStatus) => void;
   deleteTask: (id: string) => void;
   purgeTask: (id: string) => void;
+  setNotificationId: (id: string, notificationId?: string) => void;
   logEvent: (
     taskId: string,
     action: HistoryAction,
@@ -155,6 +156,12 @@ export const useTaskStore = create<TaskState>()(
       },
       purgeTask: (id) =>
         set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+      setNotificationId: (id, notificationId) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === id ? { ...t, notificationId } : t,
+          ),
+        })),
       logEvent: (taskId, action, description) =>
         set((state) => ({
           history: [makeEntry(taskId, action, description), ...state.history],

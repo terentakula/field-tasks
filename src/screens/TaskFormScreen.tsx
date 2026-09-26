@@ -21,6 +21,8 @@ import { useEffect, useState } from "react";
 import { AttachedFile } from "../types/task";
 import AttachmentThumb from "../components/AttachmentThumb";
 import { pickDocument, pickImage } from "../services/attachmentService";
+import { useSettingsStore } from '../storage/settingsStore';
+import { scheduleReminder, cancelReminder, notificationsSupported } from '../services/notificationService';
 
 function pickDateTime(current: Date, onPicked: (date: Date) => void) {
   DateTimePickerAndroid.open({
@@ -54,6 +56,8 @@ export default function TaskFormScreen() {
   );
   const addTask = useTaskStore((s) => s.addTask);
   const updateTask = useTaskStore((s) => s.updateTask);
+  const setNotificationId = useTaskStore((s) => s.setNotificationId);
+  const demoMode = useSettingsStore((s) => s.demoNotifications);
   const isEdit = Boolean(existing);
 
   const  [attachments, setAttachments] = useState<AttachedFile[]>(existing?.attachedFiles ?? [])
@@ -110,29 +114,45 @@ export default function TaskFormScreen() {
     setValue("longitude", point?.longitude);
   };
 
-  const onSubmit = (values: TaskFormValues) => {
+    const onSubmit = async (values: TaskFormValues) => {
     if (!isEdit && values.dueDate.getTime() <= Date.now()) {
-      setError("dueDate", { message: "Due date must be in the future" });
+      setError('dueDate', { message: 'Due date must be in the future' });
       return;
     }
+
     const input: TaskInput = {
-        title: values.title,
-        description: values.description,
-        dueDate: values.dueDate.toISOString(),
-        location: {
-            address: values.address,
-            latitude: values.latitude,
-            longitude: values.longitude,
-        },
-        attachedFiles: attachments,
+      title: values.title,
+      description: values.description,
+      dueDate: values.dueDate.toISOString(),
+      location: {
+        address: values.address,
+        latitude: values.latitude,
+        longitude: values.longitude,
+      },
+      attachedFiles: attachments,
+    };
+
+    let taskId: string;
+    if (existing) {
+      await cancelReminder(existing.notificationId);
+      updateTask(existing.id, input);
+      taskId = existing.id;
+    } else {
+      taskId = addTask(input).id;
     }
 
-    if (existing) {
-        updateTask(existing.id, input)
-    } else {
-        addTask(input)
+    try {
+      const notificationId = await scheduleReminder(taskId, input.title, input.dueDate, demoMode);
+      setNotificationId(taskId, notificationId);
+      if (notificationsSupported && !notificationId && new Date(input.dueDate).getTime() > Date.now()) {
+        Alert.alert('Reminder not scheduled', 'Allow notifications in system settings to get task reminders.');
+      }
+    } catch (error) {
+      console.log('Notification error:', error);
+      Alert.alert('Reminder not scheduled', 'The task was saved, but the reminder could not be created.');
     }
-    navigation.goBack()
+
+    navigation.goBack();
   };
   return (
     <ScrollView
