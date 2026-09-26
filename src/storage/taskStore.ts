@@ -1,4 +1,10 @@
-import { HistoryAction, HistoryEntry, Task, TaskStatus } from "../types/task";
+import {
+  HistoryAction,
+  HistoryEntry,
+  SyncStatus,
+  Task,
+  TaskStatus,
+} from "../types/task";
 import * as Crypto from "expo-crypto";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -41,6 +47,8 @@ interface TaskState {
   changeStatus: (id: string, status: TaskStatus) => void;
   deleteTask: (id: string) => void;
   purgeTask: (id: string) => void;
+  setSyncStatus: (id: string, syncStatus: SyncStatus) => void;
+  upsertFromServer: (remote: Task) => void;
   setNotificationId: (id: string, notificationId?: string) => void;
   logEvent: (
     taskId: string,
@@ -156,6 +164,31 @@ export const useTaskStore = create<TaskState>()(
       },
       purgeTask: (id) =>
         set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+      setSyncStatus: (id, syncStatus) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === id ? { ...t, syncStatus } : t,
+          ),
+        })),
+
+      upsertFromServer: (remote) =>
+        set((state) => {
+          const normalized: Task = {
+            ...remote,
+            attachedFiles: remote.attachedFiles ?? [],
+            syncStatus: "synced",
+          };
+          const exists = state.tasks.some((t) => t.id === remote.id);
+          return {
+            tasks: exists
+              ? state.tasks.map((t) =>
+                  t.id === remote.id
+                    ? { ...normalized, notificationId: t.notificationId }
+                    : t,
+                )
+              : [normalized, ...state.tasks],
+          };
+        }),
       setNotificationId: (id, notificationId) =>
         set((state) => ({
           tasks: state.tasks.map((t) =>

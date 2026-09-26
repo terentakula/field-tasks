@@ -24,11 +24,9 @@ export default function TaskCard({ task, onPress }: Props) {
       <Text style={styles.meta} numberOfLines={1}>
         {task.location.address}
       </Text>
-      {task.syncStatus !== "synced" && (
-        <Text style={styles.sync}>
-          {task.syncStatus === "pending" ? "Pending sync" : "Sync faild"}
-        </Text>
-      )}
+      <Text style={[styles.sync, task.syncStatus === 'synced' && styles.synced]}>
+        {task.syncStatus === 'synced' ? 'Synced' : task.syncStatus === 'pending' ? 'Pending sync' : 'Sync failed'}
+      </Text>
     </Pressable>
   );
 }
@@ -50,4 +48,5 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: 17, fontWeight: "600" },
   meta: { fontSize: 14, color: "#555", marginTop: 6 },
   sync: { fontSize: 12, color: "#B45309", marginTop: 6 },
+   synced: { color: '#059669' },
 });

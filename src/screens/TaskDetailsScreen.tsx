@@ -50,6 +50,7 @@ export default function TaskDetailsScreen() {
         style: "destructive",
         onPress: () => {
           cancelReminder(task.notificationId);
+          deleteTask(task.id);
           navigation.goBack();
         },
       },
@@ -96,7 +97,7 @@ export default function TaskDetailsScreen() {
             style={styles.secondaryButton}
             onPress={() => {
               changeStatus(task.id, s);
-              if (s === 'completed' || s === 'canceled') {
+              if (s === "completed" || s === "canceled") {
                 cancelReminder(task.notificationId);
                 setNotificationId(task.id, undefined);
               }
